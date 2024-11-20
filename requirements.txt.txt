@@ -1,0 +1,10 @@
+1.numpy
+2.pandas
+3.Pillow
+4.streamlit
+5.openbabel-wheel
+6.rdkit
+7.molvs
+8.mordred
+9.plotly
+10.scikit-learn
