@@ -1,14 +1,23 @@
+# -*- coding: utf-8 -*-
+"""
+Minimal Streamlit app – Step 1: just to check everything runs.
+"""
+
+from pathlib import Path
+import pickle
+
+import numpy as np
+import pandas as pd
+from sklearn.preprocessing import MinMaxScaler
 import streamlit as st
 
-st.set_page_config(page_title="N. incerta demo", page_icon="🧪")
 
-st.title("My first Streamlit app 🎈")
+# Basic page configuration
+st.set_page_config(
+    page_title="Fouling-release demo",
+    page_icon="🧪",
+    layout="wide",
+)
 
-st.write("Hello, I'm Estefanía and this is my first app deployed with Streamlit and GitHub.")
-
-value = st.slider("Select a number", 0, 100, 50)
-st.write("The selected value is:", value)
-
-name = st.text_input("Write your name:")
-if name:
-    st.write(f"Hello, {name}! 👋")
+st.title("Demo Streamlit – Step 1")
+st.write("If you can see this text, Streamlit is working correctly.")
