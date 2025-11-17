@@ -1,15 +1,16 @@
 import streamlit as st
-# Título principal
-st.title("Mi primera app con Streamlit 🎈")
 
-# Texto
-st.write("Hola, soy Estefanía y esta es mi primera app desplegada con Streamlit y GitHub.")
+# Main title
+st.title("My first Streamlit app 🎈")
 
-# Un slider de ejemplo
-valor = st.slider("Selecciona un número", 0, 100, 50)
-st.write("El valor seleccionado es:", valor)
+# Text
+st.write("Hello, I'm Estefanía and this is my first app deployed with Streamlit and GitHub.")
 
-# Entrada de texto
-nombre = st.text_input("Escribe tu nombre:")
-if nombre:
-    st.write(f"¡Hola, {nombre}! 👋")
+# Example slider
+value = st.slider("Select a number", 0, 100, 50)
+st.write("The selected value is:", value)
+
+# Text input
+name = st.text_input("Write your name:")
+if name:
+    st.write(f"Hello, {name}! 👋")
