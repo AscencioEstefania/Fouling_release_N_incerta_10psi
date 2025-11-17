@@ -79,3 +79,30 @@ st.markdown(
 - Additive percentage: **{percentage}%**
 """
 )
+
+# --- Step 3: basic derived quantities (fractions and ID) ---
+st.markdown("---")
+st.subheader("Derived quantities")
+
+SBMA_UNIT_MW = 280.41
+PDMS_UNIT_MW = 92.12
+
+fraction_sbma = sbma_mw / SBMA_UNIT_MW if SBMA_UNIT_MW > 0 else 0.0
+fraction_pdms = pdms_mw / PDMS_UNIT_MW if PDMS_UNIT_MW > 0 else 0.0
+
+# Build a simple mixture ID (we can refine the formatting later)
+mixture_id = f"SBMA{sbma_mw:.2f}_PDMS{pdms_mw:.2f}_at_{percentage:.2f}"
+
+col_a, col_b, col_c = st.columns(3)
+
+with col_a:
+    st.metric("SBMA unit MW", f"{SBMA_UNIT_MW}")
+    st.metric("SBMA fraction (n units)", f"{fraction_sbma:.2f}")
+
+with col_b:
+    st.metric("PDMS unit MW", f"{PDMS_UNIT_MW}")
+    st.metric("PDMS fraction (n units)", f"{fraction_pdms:.2f}")
+
+with col_c:
+    st.write("Mixture ID")
+    st.code(mixture_id, language="text")
