@@ -70,3 +70,12 @@ st.markdown(
 - Additive percentage: **{percentage}%**
 """
 )
+
+st.markdown(
+    f"""
+**Summary of inputs**  
+- SBMA molecular weight: **{sbma_mw}**  
+- PDMS molecular weight: **{pdms_mw}**  
+- Additive percentage: **{percentage}%**
+"""
+)
