@@ -15,71 +15,29 @@ import pandas as pd
 from sklearn.preprocessing import MinMaxScaler
 import streamlit as st
 
-@st.cache_resource
-def load_ensemble(path: str):
-    """
-    Load the trained Ensemble model / artifact.
+# ============================================================
+#                GLOBAL CONFIG / CONSTANTS
+# ============================================================
 
-    The .pkl can be either:
-    - A dict with keys: model_A, model_B, scaler, feature_cols, weights
-    - An instance of EnsembleModel (old style), where attributes may be
-      named mA, mB, feature_names, etc.
-    """
-    if not os.path.exists(path):
-        raise FileNotFoundError(f"Model file not found: {path}")
+# Paths (relative to repo root)
+MODELS_DIR = "Models"                     # Folder in GitHub with .pkl files
+MODEL_FILE = "Ensemble_GBR_Model.pkl"    # Ensemble artifact
+MODEL_PATH = os.path.join(MODELS_DIR, MODEL_FILE)
 
-    with open(path, "rb") as f:
-        obj = pickle.load(f)
+DATA_PATH = "ml_FR_Predictor.csv"        # Dataset used to drive predictions
 
-    # Case 1: already a dict with the expected keys
-    if isinstance(obj, dict):
-        return obj
+# Default feature list (used as fallback if not present in the pickle)
+FEATURE_COLS_DEFAULT = [
+    "HATS5p",
+    "ESpm01d",
+    "RDF130p",
+    "RDF015e",
+    "BELe7",
+    "ALOGP2",
+    "RDF035p",
+]
 
-    # Case 2: an EnsembleModel instance saved in the past
-    if isinstance(obj, EnsembleModel):
-        # DEBUG: show attributes so we know how it was saved
-        attrs = list(obj.__dict__.keys())
-        st.warning(
-            "DEBUG: loaded an EnsembleModel instance from pickle. "
-            f"Attributes found: {attrs}"
-        )
-
-        # ---- Map internal names to unified artifact keys ----
-        # Models A and B (try several possible attribute names)
-        model_A = getattr(obj, "model_A", None)
-        if model_A is None:
-            model_A = getattr(obj, "mA", None)
-
-        model_B = getattr(obj, "model_B", None)
-        if model_B is None:
-            model_B = getattr(obj, "mB", None)
-
-        # Scaler
-        scaler = getattr(obj, "scaler", None)
-
-        # Feature names / columns
-        feature_cols = getattr(obj, "feature_cols", None)
-        if feature_cols is None:
-            feature_cols = getattr(obj, "feature_names", None)
-        if feature_cols is None:
-            # fallback to global FEATURE_COLS defined above
-            feature_cols = FEATURE_COLS
-
-        # Weights
-        wA = getattr(obj, "wA", 0.73)
-        wB = getattr(obj, "wB", 0.27)
-
-        artifact = {
-            "model_A": model_A,
-            "model_B": model_B,
-            "scaler": scaler,
-            "feature_cols": feature_cols,
-            "weights": (wA, wB),
-        }
-        return artifact
-
-    # Any other type is unsupported
-    raise TypeError(f"Unsupported object type in pickle: {type(obj)}")
+LABEL_CANDIDATES = ["NAME", "Name", "Nombre", "Coating", "ID"]
 
 
 # ------------------------------------------------------------------
@@ -92,6 +50,7 @@ class EnsembleModel:
     It is here mainly so that pickle can find the same class
     that was used when the model was saved.
     """
+
     def __init__(self, model_A=None, model_B=None,
                  scaler=None, feature_cols=None,
                  wA=0.73, wB=0.27):
@@ -110,6 +69,91 @@ class EnsembleModel:
         pred_A = self.model_A.predict(X)
         pred_B = self.model_B.predict(X)
         return self.wA * pred_A + self.wB * pred_B
+
+
+# ============================================================
+#                ENSEMBLE LOADING FUNCTION
+# ============================================================
+@st.cache_resource
+def load_ensemble(path: str):
+    """
+    Load the trained Ensemble model / artifact.
+
+    The .pkl can be:
+    - A dict with keys: model_A, model_B, scaler, feature_cols, weights
+      (or older names: mA, mB, feature_names, wA, wB)
+    - An EnsembleModel instance saved in the past.
+    This function normalizes everything to a dict with keys:
+    {model_A, model_B, scaler, feature_cols, weights}
+    """
+    if not os.path.exists(path):
+        raise FileNotFoundError(f"Model file not found: {path}")
+
+    with open(path, "rb") as f:
+        obj = pickle.load(f)
+
+    # ---------- Case 1: object is an EnsembleModel ----------
+    if isinstance(obj, EnsembleModel):
+        attrs = obj.__dict__
+        st.info(
+            "DEBUG: loaded an EnsembleModel instance from pickle. "
+            f"Attributes found: {list(attrs.keys())}"
+        )
+
+        # Old naming (mA/mB/feature_names) or new naming (model_A/model_B/feature_cols)
+        model_A = attrs.get("model_A") or attrs.get("mA")
+        model_B = attrs.get("model_B") or attrs.get("mB")
+        scaler = attrs.get("scaler")
+        feature_cols = (
+            attrs.get("feature_cols")
+            or attrs.get("feature_names")
+            or FEATURE_COLS_DEFAULT
+        )
+        wA = attrs.get("wA")
+        wB = attrs.get("wB")
+
+        if any(x is None for x in [model_A, model_B, scaler, feature_cols, wA, wB]):
+            raise ValueError(
+                "The loaded EnsembleModel is missing internal models, "
+                "scaler, feature names or weights."
+            )
+
+        return {
+            "model_A": model_A,
+            "model_B": model_B,
+            "scaler": scaler,
+            "feature_cols": feature_cols,
+            "weights": (wA, wB),
+        }
+
+    # ---------- Case 2: object is a dict ----------
+    if isinstance(obj, dict):
+        model_A = obj.get("model_A") or obj.get("mA")
+        model_B = obj.get("model_B") or obj.get("mB")
+        scaler = obj.get("scaler")
+        feature_cols = (
+            obj.get("feature_cols")
+            or obj.get("feature_names")
+            or FEATURE_COLS_DEFAULT
+        )
+        weights = obj.get("weights") or (obj.get("wA"), obj.get("wB"))
+
+        if any(x is None for x in [model_A, model_B, scaler, feature_cols]) or weights is None:
+            raise ValueError(
+                "Dictionary ensemble pickle is missing required pieces "
+                "(models, scaler, feature_cols or weights)."
+            )
+
+        return {
+            "model_A": model_A,
+            "model_B": model_B,
+            "scaler": scaler,
+            "feature_cols": feature_cols,
+            "weights": weights,
+        }
+
+    # ---------- Anything else ----------
+    raise TypeError(f"Unexpected object type in ensemble pickle: {type(obj)}")
 
 
 # Try importing SHAP + matplotlib
@@ -222,59 +266,27 @@ with col_c:
 st.markdown("---")
 st.header("2. Ensemble model — *N. incerta* (10 psi)")
 
-# Paths (relative to repo root)
-MODELS_DIR = "Models"                     # Folder in GitHub with .pkl files
-MODEL_FILE = "Ensemble_GBR_Model.pkl"    # Ensemble artifact
-MODEL_PATH = os.path.join(MODELS_DIR, MODEL_FILE)
+# ---- Load ensemble artifact ----
+try:
+    artifact = load_ensemble(MODEL_PATH)
+except Exception as e:
+    st.error(f"Error loading Ensemble model:\n\n{e}")
+    st.stop()
 
-DATA_PATH = "ml_FR_Predictor.csv"        # Dataset used to drive predictions
+model_A = artifact["model_A"]
+model_B = artifact["model_B"]
+scaler = artifact["scaler"]
+wA, wB = artifact["weights"]
+feature_cols = artifact["feature_cols"]
 
-FEATURE_COLS = ["HATS5p", "ESpm01d", "RDF130p",
-                "RDF015e", "BELe7", "ALOGP2", "RDF035p"]
-LABEL_CANDIDATES = ["NAME", "Name", "Nombre", "Coating", "ID"]
-
-
-@st.cache_resource
-def load_ensemble(path: str):
-    """
-    Load the trained Ensemble model / artifact.
-
-    The .pkl can be either:
-    - A dict with keys: model_A, model_B, scaler, feature_cols, weights
-    - An instance of EnsembleModel (old style).
-    """
-    if not os.path.exists(path):
-        raise FileNotFoundError(f"Model file not found: {path}")
-
-    with open(path, "rb") as f:
-        obj = pickle.load(f)
-
-    # Case 1: already a dict with the expected keys
-    if isinstance(obj, dict):
-        return obj
-
-    # Case 2: an EnsembleModel instance saved in the past
-    if isinstance(obj, EnsembleModel):
-        # DEBUG: show what attributes this object really has
-        st.warning(
-            "DEBUG: loaded an EnsembleModel instance from pickle. "
-            f"Attributes found: {list(obj.__dict__.keys())}"
-        )
-
-        artifact = {
-            "model_A": getattr(obj, "model_A", None),
-            "model_B": getattr(obj, "model_B", None),
-            "scaler": getattr(obj, "scaler", None),
-            "feature_cols": getattr(obj, "feature_cols", FEATURE_COLS),
-            "weights": (
-                getattr(obj, "wA", 0.73),
-                getattr(obj, "wB", 0.27),
-            ),
-        }
-        return artifact
-
-    # Any other type is unsupported
-    raise TypeError(f"Unsupported object type in pickle: {type(obj)}")
+# Safety check
+if (model_A is None) or (model_B is None) or (scaler is None):
+    st.error(
+        "The loaded Ensemble model is missing internal models or scaler.\n\n"
+        "Please re-save `Ensemble_GBR_Model.pkl` as a dictionary with keys:\n"
+        "`model_A`, `model_B`, `scaler`, `feature_cols`, `weights`."
+    )
+    st.stop()
 
 
 @st.cache_data
@@ -294,27 +306,6 @@ def load_predictor_csv(path: str):
 
     return df, label_col
 
-
-# ---- Load ensemble artifact ----
-try:
-    artifact = load_ensemble(MODEL_PATH)
-except Exception as e:
-    st.error(f"Error loading Ensemble model:\n\n{e}")
-    st.stop()
-
-model_A = artifact["model_A"]
-model_B = artifact["model_B"]
-scaler = artifact["scaler"]
-wA, wB = artifact["weights"]
-feature_cols = artifact["feature_cols"]
-
-if (model_A is None) or (model_B is None) or (scaler is None):
-    st.error(
-        "The loaded Ensemble model is missing internal models or scaler.\n\n"
-        "Please re-save `Ensemble_GBR_Model.pkl` as a dictionary with keys:\n"
-        "`model_A`, `model_B`, `scaler`, `feature_cols`, `weights`."
-    )
-    st.stop()
 
 # ---- Load dataset for coating selection ----
 try:
