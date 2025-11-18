@@ -222,16 +222,14 @@ st.markdown("---")
 st.header("3. Global Feature Importance (SHAP – Ensemble)")
 
 if not HAS_SHAP:
-    st.info("SHAP is not installed. Install it with:  
-             `pip install shap`")
+    st.info("SHAP is not installed. Install it with: `pip install shap`")
 else:
-
     @st.cache_resource
     def compute_shap_global(artifact, df):
         model_A = artifact["model_A"]
         model_B = artifact["model_B"]
-        scaler = artifact["scaler"]
-        wA, wB = artifact["weights"]
+        scaler  = artifact["scaler"]
+        wA, wB  = artifact["weights"]
         feature_cols = artifact["feature_cols"]
 
         X = df[feature_cols].to_numpy(float)
@@ -246,6 +244,8 @@ else:
         shap_ensemble = wA * shap_A + wB * shap_B
 
         return shap_ensemble, X_scaled, feature_cols
+
+
 
     try:
         shap_values, X_scaled_all, feat_names = compute_shap_global(artifact, df_valid)
