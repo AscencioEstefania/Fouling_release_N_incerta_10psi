@@ -174,7 +174,7 @@ def load_ensemble(path: str):
 
     The .pkl can be either:
     - A dict with keys: model_A, model_B, scaler, feature_cols, weights
-    - An instance of EnsembleModel
+    - An instance of EnsembleModel (old style).
     """
     if not os.path.exists(path):
         raise FileNotFoundError(f"Model file not found: {path}")
@@ -182,19 +182,32 @@ def load_ensemble(path: str):
     with open(path, "rb") as f:
         obj = pickle.load(f)
 
-    # If it's already an EnsembleModel instance, convert to dict-like artifact
+    # Case 1: already a dict with the expected keys
+    if isinstance(obj, dict):
+        return obj
+
+    # Case 2: an EnsembleModel instance saved in the past
     if isinstance(obj, EnsembleModel):
+        # DEBUG: show what attributes this object really has
+        st.warning(
+            "DEBUG: loaded an EnsembleModel instance from pickle. "
+            f"Attributes found: {list(obj.__dict__.keys())}"
+        )
+
         artifact = {
-            "model_A": obj.model_A,
-            "model_B": obj.model_B,
-            "scaler": obj.scaler,
-            "feature_cols": obj.feature_cols,
-            "weights": (obj.wA, obj.wB),
+            "model_A": getattr(obj, "model_A", None),
+            "model_B": getattr(obj, "model_B", None),
+            "scaler": getattr(obj, "scaler", None),
+            "feature_cols": getattr(obj, "feature_cols", FEATURE_COLS),
+            "weights": (
+                getattr(obj, "wA", 0.73),
+                getattr(obj, "wB", 0.27),
+            ),
         }
         return artifact
 
-    # Otherwise assume it is a dict with the expected keys
-    return obj
+    # Any other type is unsupported
+    raise TypeError(f"Unsupported object type in pickle: {type(obj)}")
 
 
 @st.cache_data
@@ -227,6 +240,14 @@ model_B = artifact["model_B"]
 scaler = artifact["scaler"]
 wA, wB = artifact["weights"]
 feature_cols = artifact["feature_cols"]
+
+if (model_A is None) or (model_B is None) or (scaler is None):
+    st.error(
+        "The loaded Ensemble model is missing internal models or scaler.\n\n"
+        "Please re-save `Ensemble_GBR_Model.pkl` as a dictionary with keys:\n"
+        "`model_A`, `model_B`, `scaler`, `feature_cols`, `weights`."
+    )
+    st.stop()
 
 # ---- Load dataset for coating selection ----
 try:
