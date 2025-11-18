@@ -15,6 +15,73 @@ import pandas as pd
 from sklearn.preprocessing import MinMaxScaler
 import streamlit as st
 
+@st.cache_resource
+def load_ensemble(path: str):
+    """
+    Load the trained Ensemble model / artifact.
+
+    The .pkl can be either:
+    - A dict with keys: model_A, model_B, scaler, feature_cols, weights
+    - An instance of EnsembleModel (old style), where attributes may be
+      named mA, mB, feature_names, etc.
+    """
+    if not os.path.exists(path):
+        raise FileNotFoundError(f"Model file not found: {path}")
+
+    with open(path, "rb") as f:
+        obj = pickle.load(f)
+
+    # Case 1: already a dict with the expected keys
+    if isinstance(obj, dict):
+        return obj
+
+    # Case 2: an EnsembleModel instance saved in the past
+    if isinstance(obj, EnsembleModel):
+        # DEBUG: show attributes so we know how it was saved
+        attrs = list(obj.__dict__.keys())
+        st.warning(
+            "DEBUG: loaded an EnsembleModel instance from pickle. "
+            f"Attributes found: {attrs}"
+        )
+
+        # ---- Map internal names to unified artifact keys ----
+        # Models A and B (try several possible attribute names)
+        model_A = getattr(obj, "model_A", None)
+        if model_A is None:
+            model_A = getattr(obj, "mA", None)
+
+        model_B = getattr(obj, "model_B", None)
+        if model_B is None:
+            model_B = getattr(obj, "mB", None)
+
+        # Scaler
+        scaler = getattr(obj, "scaler", None)
+
+        # Feature names / columns
+        feature_cols = getattr(obj, "feature_cols", None)
+        if feature_cols is None:
+            feature_cols = getattr(obj, "feature_names", None)
+        if feature_cols is None:
+            # fallback to global FEATURE_COLS defined above
+            feature_cols = FEATURE_COLS
+
+        # Weights
+        wA = getattr(obj, "wA", 0.73)
+        wB = getattr(obj, "wB", 0.27)
+
+        artifact = {
+            "model_A": model_A,
+            "model_B": model_B,
+            "scaler": scaler,
+            "feature_cols": feature_cols,
+            "weights": (wA, wB),
+        }
+        return artifact
+
+    # Any other type is unsupported
+    raise TypeError(f"Unsupported object type in pickle: {type(obj)}")
+
+
 # ------------------------------------------------------------------
 # Helper EnsembleModel class so that pickle can load the saved object
 # (in case the .pkl was created as an instance of this class)
