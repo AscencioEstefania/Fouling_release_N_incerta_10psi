@@ -1,10 +1,9 @@
-
 # -*- coding: utf-8 -*-
 """
 Full Streamlit application:
 - Step 1: SBMA–PDMS input form
 - Step 2: Ensemble prediction (N. incerta at 10 psi)
-- Step 3: Global SHAP importance (Ensemble only)
+- Step 3: Global SHAP importance (Ensemble)
 """
 
 from pathlib import Path
@@ -13,7 +12,7 @@ import os
 
 import numpy as np
 import pandas as pd
-from sklearn.preprocessing import MinMaxScaler  # (not strictly needed, but fine)
+from sklearn.preprocessing import MinMaxScaler
 import streamlit as st
 
 # ------------------------------------------------------------------
@@ -72,10 +71,10 @@ st.write(
 
 
 # ============================================================
-#            PART 1 — USER INPUTS: SBMA–PDMS ADDITIVE
+#            PART 1 — SBMA–PDMS USER INPUT SECTION
 # ============================================================
 st.markdown("---")
-st.header("1. SBMA–PDMS Additive Definition")
+st.header("1. SBMA–PDMS additive definition")
 
 col1, col2, col3 = st.columns(3)
 
@@ -103,7 +102,7 @@ percentage = col3.number_input(
     step=0.1,
 )
 
-# Simple validation
+# Validation messages
 if sbma_mw < 280.41 or sbma_mw > 5000.0:
     st.error("SBMA molecular weight must be between 280.41 and 5000.0.")
 
@@ -116,18 +115,16 @@ if percentage < 0.2 or percentage > 5.0:
 # Summary of inputs
 st.markdown(
     f"""
-### Input Summary
+### Input summary
 - **SBMA molecular weight:** {sbma_mw}  
 - **PDMS molecular weight:** {pdms_mw}  
 - **Additive percentage:** {percentage}%
 """
 )
 
-# ============================================================
-#                  DERIVED QUANTITIES
-# ============================================================
+# Derived quantities
 st.markdown("---")
-st.subheader("Derived Quantities")
+st.subheader("Derived quantities")
 
 SBMA_UNIT_MW = 280.41
 PDMS_UNIT_MW = 92.12
@@ -156,7 +153,7 @@ with col_c:
 #        PART 2 — ENSEMBLE MODEL (N. INCERTA 10 PSI)
 # ============================================================
 st.markdown("---")
-st.header("2. Ensemble Model — *N. incerta* (10 psi)")
+st.header("2. Ensemble model — *N. incerta* (10 psi)")
 
 # Paths (relative to repo root)
 MODELS_DIR = "Models"                     # Folder in GitHub with .pkl files
@@ -250,7 +247,7 @@ df_valid = df_all.dropna(subset=feature_cols).copy()
 col_left, col_right = st.columns([2, 1])
 
 with col_left:
-    st.subheader("Select an Existing Coating")
+    st.subheader("Select an existing coating")
 
     if df_valid.empty:
         st.error("No valid rows in the dataset. Please check ml_FR_Predictor.csv.")
@@ -264,7 +261,7 @@ with col_left:
         st.dataframe(row[feature_cols].to_frame(name="value"))
 
 with col_right:
-    st.subheader("Ensemble Prediction")
+    st.subheader("Ensemble prediction")
 
     if df_valid.empty or row is None:
         st.info("No prediction available (dataset is empty).")
@@ -292,7 +289,7 @@ with col_right:
 #               PART 3 — GLOBAL SHAP IMPORTANCE
 # ============================================================
 st.markdown("---")
-st.header("3. Global Feature Importance (SHAP – Ensemble)")
+st.header("3. Global feature importance (SHAP – Ensemble)")
 
 if not HAS_SHAP:
     st.info("SHAP is not installed. Install it with: `pip install shap`")
@@ -340,4 +337,3 @@ else:
 
         except Exception as e:
             st.error(f"Error computing SHAP values:\n\n{e}")
-
