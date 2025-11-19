@@ -291,20 +291,36 @@ if (model_A is None) or (model_B is None) or (scaler is None):
 
 @st.cache_data
 def load_predictor_csv(path: str):
-    """Load ml_FR_Predictor.csv and detect a label column."""
-    df = pd.read_csv(path)
+    """
+    Load ml_FR_Predictor.csv and detect a label column.
+    - Try default delimiter ','.
+    - If it looks like a single-column file, retry with ';'.
+    - Strip spaces from column names.
+    """
+    # 1) First attempt: default comma delimiter
+    df = pd.read_csv(path, encoding="UTF-8")
 
+    # 2) If the file appears to have only one column, retry with ';'
+    if df.shape[1] == 1:
+        df = pd.read_csv(path, encoding="UTF-8", delimiter=";")
+
+    # 3) Clean column names: remove all surrounding spaces
+    df.columns = df.columns.astype(str).str.strip()
+
+    # 4) Detect a label/name column
     label_col = None
     for c in LABEL_CANDIDATES:
         if c in df.columns:
             label_col = c
             break
 
+    # If nothing is found, create a synthetic coating ID
     if label_col is None:
         df["Coating_ID"] = np.arange(len(df))
         label_col = "Coating_ID"
 
     return df, label_col
+
 
 
 # ---- Load dataset for coating selection ----
