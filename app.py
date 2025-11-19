@@ -175,11 +175,17 @@ st.set_page_config(
 )
 
 st.title("Fouling-Release Predictor")
+
+st.image(
+    "fouling_boat.png",  # make sure this matches the real file name
+    caption="Severe marine biofouling on a ship hull.",
+    use_column_width=True,
+)
+
 st.write(
     "Minimal demonstration of the SBMA–PDMS additive module "
     "+ Ensemble model prediction for *Navicula incerta* at 10 psi."
 )
-
 
 # ============================================================
 #            PART 1 — SBMA–PDMS USER INPUT SECTION
