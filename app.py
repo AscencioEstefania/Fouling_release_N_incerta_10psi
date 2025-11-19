@@ -183,7 +183,7 @@ st.image(
 )
 
 st.write(
-    "Minimal demonstration of the SBMA–PDMS additive module "
+    #"Minimal demonstration of the SBMA–PDMS additive module "
     "+ Ensemble model prediction for *Navicula incerta* at 10 psi."
 )
 
