@@ -77,6 +77,12 @@ def load_ensemble(path: str):
         wA = attrs.get("wA")
         wB = attrs.get("wB")
 
+        if any(x is None for x in [model_A, model_B, scaler, feature_cols, wA, wB]):
+            raise ValueError(
+                "The loaded EnsembleModel is missing internal models, "
+                "scaler, feature names or weights."
+            )
+
         return {
             "model_A": model_A,
             "model_B": model_B,
@@ -96,6 +102,12 @@ def load_ensemble(path: str):
         )
         weights = obj.get("weights") or (obj.get("wA"), obj.get("wB"))
 
+        if any(x is None for x in [model_A, model_B, scaler, feature_cols]) or weights is None:
+            raise ValueError(
+                "Dictionary ensemble pickle is missing required pieces "
+                "(models, scaler, feature_cols or weights)."
+            )
+
         return {
             "model_A": model_A,
             "model_B": model_B,
@@ -107,12 +119,16 @@ def load_ensemble(path: str):
     raise TypeError(f"Unexpected object type in ensemble pickle: {type(obj)}")
 
 
-def fix_model_input_size(X_scaled, model_A):
-    expected = model_A.n_features_in_
+def fix_model_input_size(X_scaled, model):
+    expected = model.n_features_in_
 
     if X_scaled.shape[1] < expected:
         missing = expected - X_scaled.shape[1]
-        X_scaled = np.hstack([X_scaled, np.zeros((X_scaled.shape[0], missing))])
+        zeros = np.zeros((X_scaled.shape[0], missing))
+        X_scaled = np.hstack([X_scaled, zeros])
+
+    elif X_scaled.shape[1] > expected:
+        X_scaled = X_scaled[:, :expected]
 
     return X_scaled
 
@@ -124,6 +140,10 @@ try:
 except Exception:
     HAS_SHAP = False
 
+
+# ============================================================
+#                  BASIC STREAMLIT CONFIGURATION
+# ============================================================
 
 st.set_page_config(
     page_title="Fouling-release predictor",
@@ -142,6 +162,7 @@ st.image(
 st.write(
     "+ Ensemble model prediction for *Navicula incerta* at 10 psi."
 )
+
 
 # ============================================================
 #            PART 1 — SBMA–PDMS USER INPUT SECTION
@@ -221,7 +242,7 @@ with col_c:
 
 
 # ============================================================
-#        PART 2 — ENSEMBLE MODEL
+#        PART 2 — ENSEMBLE MODEL (N. INCERTA 10 PSI)
 # ============================================================
 
 st.markdown("---")
@@ -241,7 +262,9 @@ feature_cols = artifact["feature_cols"]
 
 if (model_A is None) or (model_B is None) or (scaler is None):
     st.error(
-        "The loaded Ensemble model is missing internal models or scaler."
+        "The loaded Ensemble model is missing internal models or scaler.\n\n"
+        "Please re-save `Ensemble_GBR_Model.pkl` as a dictionary with keys:\n"
+        "`model_A`, `model_B`, `scaler`, `feature_cols`, `weights`."
     )
     st.stop()
 
@@ -275,7 +298,6 @@ except Exception as e:
     st.stop()
 
 missing = [c for c in feature_cols if c not in df_all.columns]
-
 if missing:
     st.error("Missing required feature columns: " + ", ".join(missing))
     st.stop()
@@ -306,7 +328,6 @@ with col_right:
     else:
         X = row[feature_cols].to_numpy(float).reshape(1, -1)
         X_scaled = scaler.transform(X)
-
         X_scaled = fix_model_input_size(X_scaled, model_A)
 
         pred_A = model_A.predict(X_scaled)[0]
@@ -343,7 +364,6 @@ else:
 
         X = df[feature_cols].to_numpy(float)
         X_scaled = scaler.transform(X)
-
         X_scaled = fix_model_input_size(X_scaled, model_A)
 
         explA = shap.TreeExplainer(model_A)
