@@ -371,6 +371,12 @@ with col_right:
         X = row[feature_cols].to_numpy(float).reshape(1, -1)
         X_scaled = scaler.transform(X)
 
+        expected = scaler.n_features_in_
+
+if X_scaled.shape[1] < expected:
+    missing = expected - X_scaled.shape[1]
+    X_scaled = np.hstack([X_scaled, np.zeros((X_scaled.shape[0], missing))])
+
         # Individual models
         pred_A = model_A.predict(X_scaled)[0]
         pred_B = model_B.predict(X_scaled)[0]
