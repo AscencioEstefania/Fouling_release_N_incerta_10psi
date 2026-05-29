@@ -6,14 +6,13 @@ Full Streamlit application:
 - Step 3: Global SHAP importance (Ensemble)
 """
 
-from pathlib import Path
-import pickle
 import os
+import pickle
 
 import numpy as np
 import pandas as pd
-from sklearn.preprocessing import MinMaxScaler
 import streamlit as st
+
 
 # ============================================================
 #                GLOBAL CONFIG / CONSTANTS
@@ -39,9 +38,15 @@ LABEL_CANDIDATES = ["NAME", "Name", "Nombre", "Coating", "ID"]
 
 
 class EnsembleModel:
-    def __init__(self, model_A=None, model_B=None,
-                 scaler=None, feature_cols=None,
-                 wA=0.73, wB=0.27):
+    def __init__(
+        self,
+        model_A=None,
+        model_B=None,
+        scaler=None,
+        feature_cols=None,
+        wA=0.73,
+        wB=0.27,
+    ):
         self.model_A = model_A
         self.model_B = model_B
         self.scaler = scaler
@@ -53,6 +58,20 @@ class EnsembleModel:
         pred_A = self.model_A.predict(X)
         pred_B = self.model_B.predict(X)
         return self.wA * pred_A + self.wB * pred_B
+
+
+def fix_model_input_size(X_scaled, model):
+    expected = model.n_features_in_
+
+    if X_scaled.shape[1] < expected:
+        missing = expected - X_scaled.shape[1]
+        zeros = np.zeros((X_scaled.shape[0], missing))
+        X_scaled = np.hstack([X_scaled, zeros])
+
+    elif X_scaled.shape[1] > expected:
+        X_scaled = X_scaled[:, :expected]
+
+    return X_scaled
 
 
 @st.cache_resource
@@ -119,23 +138,10 @@ def load_ensemble(path: str):
     raise TypeError(f"Unexpected object type in ensemble pickle: {type(obj)}")
 
 
-def fix_model_input_size(X_scaled, model):
-    expected = model.n_features_in_
-
-    if X_scaled.shape[1] < expected:
-        missing = expected - X_scaled.shape[1]
-        zeros = np.zeros((X_scaled.shape[0], missing))
-        X_scaled = np.hstack([X_scaled, zeros])
-
-    elif X_scaled.shape[1] > expected:
-        X_scaled = X_scaled[:, :expected]
-
-    return X_scaled
-
-
 try:
     import shap
     import matplotlib.pyplot as plt
+
     HAS_SHAP = True
 except Exception:
     HAS_SHAP = False
@@ -298,6 +304,7 @@ except Exception as e:
     st.stop()
 
 missing = [c for c in feature_cols if c not in df_all.columns]
+
 if missing:
     st.error("Missing required feature columns: " + ", ".join(missing))
     st.stop()
@@ -317,6 +324,7 @@ with col_left:
         selected = st.selectbox("Coating:", options)
 
         row = df_valid[df_valid[label_col].astype(str) == selected].iloc[0]
+
         st.markdown("**Descriptor values used by the model:**")
         st.dataframe(row[feature_cols].to_frame(name="value"))
 
@@ -324,20 +332,22 @@ with col_right:
     st.subheader("Ensemble prediction")
 
     if df_valid.empty or row is None:
-        st.info("No prediction available (dataset is empty).")
+        st.info("No prediction available because the dataset is empty.")
     else:
         X = row[feature_cols].to_numpy(float).reshape(1, -1)
-        X_scaled = scaler.transform(X)
-        X_scaled = fix_model_input_size(X_scaled, model_A)
 
-        pred_A = model_A.predict(X_scaled)[0]
-        pred_B = model_B.predict(X_scaled)[0]
+        X_scaled = scaler.transform(X)
+        X_scaled_A = fix_model_input_size(X_scaled, model_A)
+        X_scaled_B = fix_model_input_size(X_scaled, model_B)
+
+        pred_A = model_A.predict(X_scaled_A)[0]
+        pred_B = model_B.predict(X_scaled_B)[0]
 
         pred_ens = wA * pred_A + wB * pred_B
 
         st.metric("Predicted % removal (Ensemble)", f"{pred_ens:.2f} %")
 
-        with st.expander("Model A and B predictions (details)"):
+        with st.expander("Model A and B predictions"):
             st.write(f"Model A: **{pred_A:.2f} %**")
             st.write(f"Model B: **{pred_B:.2f} %**")
             st.write(f"Weights → wA = {wA:.2f}, wB = {wB:.2f}")
@@ -352,6 +362,7 @@ st.header("3. Global feature importance (SHAP – Ensemble)")
 
 if not HAS_SHAP:
     st.info("SHAP is not installed. Install it with: `pip install shap`")
+
 else:
 
     @st.cache_resource
@@ -363,25 +374,29 @@ else:
         feature_cols = artifact["feature_cols"]
 
         X = df[feature_cols].to_numpy(float)
+
         X_scaled = scaler.transform(X)
-        X_scaled = fix_model_input_size(X_scaled, model_A)
+        X_scaled_A = fix_model_input_size(X_scaled, model_A)
+        X_scaled_B = fix_model_input_size(X_scaled, model_B)
 
         explA = shap.TreeExplainer(model_A)
         explB = shap.TreeExplainer(model_B)
 
-        shap_A = explA.shap_values(X_scaled)
-        shap_B = explB.shap_values(X_scaled)
+        shap_A = explA.shap_values(X_scaled_A)
+        shap_B = explB.shap_values(X_scaled_B)
 
         shap_ensemble = wA * shap_A + wB * shap_B
 
-        return shap_ensemble, X_scaled, feature_cols
+        return shap_ensemble, X_scaled_A, feature_cols
 
     if df_valid.empty:
         st.info("No data available to compute SHAP values.")
+
     else:
         try:
             shap_values, X_scaled_all, feat_names = compute_shap_global(
-                artifact, df_valid
+                artifact,
+                df_valid,
             )
 
             shap.summary_plot(
