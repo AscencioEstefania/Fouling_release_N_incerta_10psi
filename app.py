@@ -363,7 +363,7 @@ with col_left:
 
 with col_right:
     st.subheader("Ensemble prediction")
-
+    
     if df_valid.empty or row is None:
         st.info("No prediction available (dataset is empty).")
     else:
@@ -374,8 +374,8 @@ with col_right:
         expected = scaler.n_features_in_
 
         if X_scaled.shape[1] < expected:
-    missing = expected - X_scaled.shape[1]
-    X_scaled = np.hstack([X_scaled, np.zeros((X_scaled.shape[0], missing))])
+           missing = expected - X_scaled.shape[1]
+           X_scaled = np.hstack([X_scaled, np.zeros((X_scaled.shape[0], missing))])
 
         # Individual models
         pred_A = model_A.predict(X_scaled)[0]
