@@ -373,7 +373,7 @@ with col_right:
 
         expected = scaler.n_features_in_
 
-    if X_scaled.shape[1] < expected:
+        if X_scaled.shape[1] < expected:
     missing = expected - X_scaled.shape[1]
     X_scaled = np.hstack([X_scaled, np.zeros((X_scaled.shape[0], missing))])
 
