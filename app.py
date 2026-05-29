@@ -13,9 +13,6 @@ import numpy as np
 import pandas as pd
 import streamlit as st
 
-st.write("PRUEBA: ESTE ARCHIVO SÍ ES EL NUEVO")
-st.stop()
-
 
 # ============================================================
 #                GLOBAL CONFIG / CONSTANTS
