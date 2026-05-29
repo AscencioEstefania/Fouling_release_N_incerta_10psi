@@ -371,12 +371,6 @@ with col_right:
         X = row[feature_cols].to_numpy(float).reshape(1, -1)
         X_scaled = scaler.transform(X)
 
-        X = row[feature_cols].to_numpy(float).reshape(1, -1)
-        X_scaled = scaler.transform(X)
-
-# Individual models
-        pred_A = model_A.predict(X_scaled)[0]
-        pred_B = model_B.predict(X_scaled)[0]
 
         # Individual models
         pred_A = model_A.predict(X_scaled)[0]
